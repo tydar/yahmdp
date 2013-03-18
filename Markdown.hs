@@ -24,32 +24,46 @@ whitespace :: ReadP Char
 whitespace = satisfy ws
     where ws c = c `elem` [' ', '\t']
 
-oneOf :: [String] -> ReadP String
-oneOf xs = foldr1 (<++) $ map (string) xs
+oneOf :: [String] -> ReadP ()
+oneOf xs = do
+    rest <- look
+    let results = scanEach xs rest
+    guard $ True `elem` results
+    return ()
+    where scanEach strs rest = map (scan rest) strs
+          scan (r:rs) (s:ss) | s == r = scan rs ss
+          scan _ [] = True
+          scan _  _ = False
+
+oneOfConsume :: [String] -> ReadP String
+oneOfConsume xs = foldr1 (<++) $ map (string) xs
 
 specials :: [String]
 specials = ["*", "_", "`", "  \n"]
 
 -- parses markdown text which ends with a particular separator
-markdownText :: String -> ReadP String
+markdownText :: [String] -> ReadP String
 markdownText [] = do
     consumed <- manyTill get (oneOf specials)
     guard (consumed /= "")
     return $ consumed
 markdownText end = do
-    consumed <- manyTill get (string end) 
+    consumed <- manyTill get (oneOfConsume end) 
     guard (consumed /= "")
     return $ consumed
 
-parseMText :: ReadP MText
-parseMText = do
-    consumed <- markdownText []
+parseMText :: [String] -> ReadP MText
+parseMText end = do
+    consumed <- markdownText end
     guard (consumed /= "")
     return $ MText consumed
 
 -- SPAN PARSING STARTS HERE --
 parseSpans :: ReadP ParText
-parseSpans = many1 (hardbreak +++ codeSpan +++ spanAsterisk +++ spanUnderscore +++ parseMText)
+parseSpans = many1 (hardbreak +++ codeSpan +++ spanAsterisk +++ spanUnderscore +++ parseMText [])
+
+parseSpansContext :: [String] -> ReadP ParText
+parseSpansContext c = many1 ((hardbreak +++ codeSpan +++ spanAsterisk +++ spanUnderscore) <++ parseMText c)
 
 hardbreak :: ReadP MText
 hardbreak = optional (whitespace) >> count 2 whitespace >> satisfy (=='\n') >> return Hardbreak
@@ -57,7 +71,7 @@ hardbreak = optional (whitespace) >> count 2 whitespace >> satisfy (=='\n') >> r
 codeSpan :: ReadP MText
 codeSpan = do
     sep <- string "``" <++ string "`"
-    content <- markdownText sep
+    content <- markdownText [sep]
     return $ Code content 
 
 spanAsterisk :: ReadP MText
@@ -69,25 +83,25 @@ spanUnderscore = strongUnderscore <++ emUnderscore
 emAsterisk :: ReadP MText
 emAsterisk = do
     string "*"
-    content <- markdownText "*"
+    content <- markdownText ["*"]
     return $ Emph content
 
 emUnderscore :: ReadP MText
 emUnderscore = do
     string "_"
-    content <- markdownText "_"
+    content <- markdownText ["_"]
     return $ Emph content
 
 strongAsterisk :: ReadP MText
 strongAsterisk = do
     string "**"
-    content <- markdownText "**"
+    content <- markdownText ["**"]
     return $ Strong content
 
 strongUnderscore :: ReadP MText
 strongUnderscore = do
     string "__"
-    content <- markdownText "__"
+    content <- markdownText ["__"]
     return $ Strong content
 -- SPAN PARSING ENDS HERE --
 
@@ -118,3 +132,30 @@ preformattedBlock :: ReadP Paragraph
 preformattedBlock = do
     lines <- many1 indentedLine
     return $ Pre $ concat lines
+
+atxHeader :: ReadP Paragraph
+atxHeader = do
+    hashes <- munch (=='#')
+    skipSpaces
+    content <- parseSpans
+    skipSpaces
+    munch (=='#')
+    optional (char '\n')
+    guard $ (length hashes <= 6)
+    return $ Heading (length hashes) content
+
+setext1Header :: ReadP Paragraph
+setext1Header = do
+    content <- parseSpans 
+    char '\n'
+    munch1 (=='=')
+    optional (char '\n')
+    return $ Heading 1 content
+
+setext2Header :: ReadP Paragraph
+setext2Header = do
+    content <- parseSpans
+    char '\n'
+    munch1 (=='-')
+    optional (char '\n')
+    return $ Heading 2 content
