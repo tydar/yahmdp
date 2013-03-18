@@ -1,0 +1,4 @@
+first is to bust text into paragraphs -- split it on double new lines, block
+creation, list initiation, quote initiation.
+
+second is to determine which type of paragraphs each of those is, and to parse the text within those paragraphs
