@@ -17,6 +17,7 @@ data MText = MText String
            | Strong String
            | Code String
            | Hardbreak
+    deriving (Show)
 
 whitespace :: ReadP Char
 whitespace = satisfy ws
@@ -26,15 +27,14 @@ whitespace = satisfy ws
 markdownText :: String -> ReadP String
 markdownText end = do
     consumed <- manyTill get (string end) 
+    guard (consumed /= "")
     return $ consumed
 
 parseSpans :: ReadP MText
-parseSpans = do
-    rest <- look
-     
+parseSpans = hardbreak +++ codeSpan +++ spanAsterisk +++ spanUnderscore
 
 hardbreak :: ReadP MText
-hardbreak = whitespace >> count 2 whitespace >> satisfy (=='\n') >> return Hardbreak
+hardbreak = optional (whitespace) >> count 2 whitespace >> satisfy (=='\n') >> return Hardbreak
 
 codeSpan :: ReadP MText
 codeSpan = do
