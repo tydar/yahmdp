@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 module Main where
 
 import Text.ParserCombinators.ReadP
@@ -71,3 +72,20 @@ strongUnderscore = do
     string "__"
     content <- markdownText "__"
     return $ Strong content
+=======
+import Text.ParserCombinators.ReadP
+import Data.Char
+import HTML
+
+-- return :: a -> m a
+-- wrap_para :: String -> Tag
+parseMarkdown = readP_to_S $ markdown_parse where
+    paragraph = do
+        first <- satisfy (not . isSpace) 
+        rest <- (munch para_char) 
+        return $ wrap_para (first:rest) 
+        where
+            wrap_para s =  p (Empty s) []
+            para_char c = or [isAlphaNum c, isSpace c, isPunctuation c, isSymbol c]
+    markdown_parse = paragraph
+>>>>>>> 2701c198b42d9ed1be4d9f7db63e2edc3206b901
