@@ -1,6 +1,7 @@
 module Main where
 
 import Text.ParserCombinators.ReadP
+import Data.Char (isPrint)
 import Control.Monad
 
 data Paragraph = Normal ParText
@@ -39,14 +40,15 @@ oneOfConsume :: [String] -> ReadP String
 oneOfConsume xs = foldr1 (<++) $ map (string) xs
 
 specials :: [String]
-specials = ["*", "_", "`", "  \n"]
+specials = ["*", "_", "`", "  \n", ">", "#"]
 
 -- parses markdown text which ends with a particular separator
 markdownText :: [String] -> ReadP String
 markdownText [] = do
-    consumed <- manyTill get (oneOf specials)
+    consumed <- manyTill get (oneOf specials) <++ munch1 notInSpecials
     guard (consumed /= "")
     return $ consumed
+    where notInSpecials c = not $ [c] `elem` specials
 markdownText end = do
     consumed <- manyTill get (oneOfConsume end) 
     guard (consumed /= "")
@@ -107,6 +109,9 @@ strongUnderscore = do
 
 -- START BLOCK PARSING HERE --
 
+blockParsers :: ReadP [Paragraph]
+blockParsers = blockQuote +++ (many1 ((preformattedBlock +++ atxHeader +++ setext1Header +++ setext2Header) <++ normalParagraph))
+
 normalParagraph :: ReadP Paragraph
 normalParagraph = do
     content <- parseSpans
@@ -135,11 +140,11 @@ preformattedBlock = do
 
 atxHeader :: ReadP Paragraph
 atxHeader = do
-    hashes <- munch (=='#')
+    hashes <- munch1 (=='#')
     skipSpaces
     content <- parseSpans
     skipSpaces
-    munch (=='#')
+    optional (munch1 (=='#'))
     optional (char '\n')
     guard $ (length hashes <= 6)
     return $ Heading (length hashes) content
@@ -159,3 +164,12 @@ setext2Header = do
     munch1 (=='-')
     optional (char '\n')
     return $ Heading 2 content
+
+blockQuoteLine :: ReadP Paragraph
+blockQuoteLine = do
+    char '>'
+    content <- blockParsers
+    return $ Quote content
+
+blockQuote :: ReadP [Paragraph]
+blockQuote = many1 blockQuoteLine
