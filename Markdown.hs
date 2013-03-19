@@ -40,7 +40,7 @@ oneOfConsume :: [String] -> ReadP String
 oneOfConsume xs = foldr1 (<++) $ map (string) xs
 
 specials :: [String]
-specials = ["*", "_", "`", "  \n", ">", "#"]
+specials = ["*", "_", "`", "  \n", ">", "#", "+"]
 
 -- parses markdown text which ends with a particular separator
 markdownText :: [String] -> ReadP String
@@ -110,7 +110,7 @@ strongUnderscore = do
 -- START BLOCK PARSING HERE --
 
 blockParsers :: ReadP [Paragraph]
-blockParsers = blockQuote +++ (many1 ((preformattedBlock +++ atxHeader +++ setext1Header +++ setext2Header) <++ normalParagraph))
+blockParsers = blockQuote +++ (many1 ((ulist +++ preformattedBlock +++ atxHeader +++ setext1Header +++ setext2Header) <++ normalParagraph))
 
 normalParagraph :: ReadP Paragraph
 normalParagraph = do
@@ -173,3 +173,15 @@ blockQuoteLine = do
 
 blockQuote :: ReadP [Paragraph]
 blockQuote = many1 blockQuoteLine
+
+ulistElem :: ReadP [Paragraph]
+ulistElem = do
+    string "+  " +++ string "+\t"
+    content <- blockParsers
+    char '\n'
+    return $ content
+
+ulist :: ReadP Paragraph
+ulist = do
+    elems <- many1 ulistElem
+    return $ UList $ concat elems 
