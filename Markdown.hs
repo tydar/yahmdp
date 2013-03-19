@@ -1,15 +1,15 @@
 module Main where
 
 import Text.ParserCombinators.ReadP
-import Data.Char (isPrint)
+import Data.Char (isPrint,isSpace, isDigit)
 import Control.Monad
 
 data Paragraph = Normal ParText
                | Pre String
                | Heading Int ParText
                | Quote [Paragraph]
-               | UList [Paragraph]
-               | OList [Paragraph]
+               | UList ParText
+               | OList ParText
     deriving (Show)
 
 type ParText = [MText]
@@ -24,6 +24,9 @@ data MText = MText String
 whitespace :: ReadP Char
 whitespace = satisfy ws
     where ws c = c `elem` [' ', '\t']
+
+newline :: ReadP String
+newline = string "\r\n" <++ string "\n" <++ string "\r"
 
 oneOf :: [String] -> ReadP ()
 oneOf xs = do
@@ -40,7 +43,7 @@ oneOfConsume :: [String] -> ReadP String
 oneOfConsume xs = foldr1 (<++) $ map (string) xs
 
 specials :: [String]
-specials = ["*", "_", "`", "  \n", ">", "#", "+"]
+specials = ["*", "_", "`", "  \n", ">", "#", "+", "1.", "2.", "3.", "4."]
 
 -- parses markdown text which ends with a particular separator
 markdownText :: [String] -> ReadP String
@@ -110,7 +113,7 @@ strongUnderscore = do
 -- START BLOCK PARSING HERE --
 
 blockParsers :: ReadP [Paragraph]
-blockParsers = blockQuote +++ (many1 ((ulist +++ preformattedBlock +++ atxHeader +++ setext1Header +++ setext2Header) <++ normalParagraph))
+blockParsers = blockQuote +++ (many1 (olist +++ ulist +++ preformattedBlock +++ atxHeader +++ setext1Header +++ setext2Header <++ normalParagraph))
 
 normalParagraph :: ReadP Paragraph
 normalParagraph = do
@@ -174,14 +177,32 @@ blockQuoteLine = do
 blockQuote :: ReadP [Paragraph]
 blockQuote = many1 blockQuoteLine
 
-ulistElem :: ReadP [Paragraph]
+{- One of the places I deviate from the official markdown implementation.
+I don't allow nested lists (which is problematic, but should be eventually fixed). I intended
+to allow this, but I was having trouble working with UList [Paragraph], so changed it
+to UList ParText, sacrificing flexibility/compatibility. -}
+
+ulistElem :: ReadP ParText
 ulistElem = do
-    string "+  " +++ string "+\t"
-    content <- blockParsers
-    char '\n'
+    char '+'
+    skipSpaces
+    content <- parseSpansContext ["\n", "+"]
     return $ content
 
 ulist :: ReadP Paragraph
 ulist = do
     elems <- many1 ulistElem
     return $ UList $ concat elems 
+
+olistElem :: ReadP ParText
+olistElem = do
+    munch1 isDigit
+    char '.'
+    skipSpaces
+    content <- parseSpansContext ["\n", "1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.","0."]
+    return $ content
+
+olist :: ReadP Paragraph
+olist = do
+    elems <- many1 olistElem
+    return $ OList $ concat elems
