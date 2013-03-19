@@ -51,7 +51,7 @@ parseMarkdown = readP_to_S blockParsers
 
 showProcessed :: [([Paragraph], String)] -> String
 showProcessed p = "<html><body>" ++ (concatMap show onlyPs) ++ "</body></html>"
-    where onlyPs = concatMap fst p
+    where onlyPs = fst $ last p
 
 whitespace :: ReadP Char
 whitespace = satisfy ws
