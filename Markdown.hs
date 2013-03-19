@@ -10,7 +10,18 @@ data Paragraph = Normal ParText
                | Quote [Paragraph]
                | UList ParText
                | OList ParText
-    deriving (Show)
+
+instance Show Paragraph where
+    show (Normal content) = "<p>" ++ (concatMap show content) ++ "</p>"
+    show (Pre content) = "<code><pre>" ++ content ++ "</pre></code>"
+    show (Heading level content) = "<h" ++ (show level) ++ ">" ++ (concatMap show content) ++ "</h" ++ (show level) ++ ">"
+    show (Quote contents) = "<blockquote>" ++ (concatMap show contents) ++ "</blockquote>"
+    show (UList contents) = "<ul>" ++ (listedList contents) ++ "</ul>"
+    show (OList contents) = "<ol>" ++ (listedList contents) ++ "</ol>"
+
+listedList :: ParText -> String
+listedList contents = concatMap (wrapLi . show) contents
+    where wrapLi s = "<li>" ++ s ++ "</li>"
 
 type ParText = [MText]
 
@@ -19,7 +30,28 @@ data MText = MText String
            | Strong String
            | Code String
            | Hardbreak
-    deriving (Show)
+
+instance Show MText where
+    show (MText contents) = contents
+    show (Emph contents) = "<em>" ++ contents ++ "</em>"
+    show (Strong contents) = "<strong>" ++ contents ++ "</strong>"
+    show (Code contents) = "<code>" ++ (encodeStr contents) ++ "</code>"
+    show (Hardbreak) = "<br />"
+
+encodeStr :: String -> String
+encodeStr (c:cs)
+    | c == '&'  = "&amp;" ++ (encodeStr cs)
+    | c == '<'  = "&lt;"  ++ (encodeStr cs)
+    | c == '>'  = "&gt;"  ++ (encodeStr cs)
+    | otherwise = c:(encodeStr cs)
+encodeStr [] = []
+
+parseMarkdown :: ReadS [Paragraph]
+parseMarkdown = readP_to_S blockParsers
+
+showProcessed :: [([Paragraph], String)] -> String
+showProcessed p = "<html><body>" ++ (concatMap show onlyPs) ++ "</body></html>"
+    where onlyPs = concatMap fst p
 
 whitespace :: ReadP Char
 whitespace = satisfy ws
