@@ -49,6 +49,7 @@ encodeStr [] = []
 parseMarkdown :: ReadS [Paragraph]
 parseMarkdown = readP_to_S blockParsers
 
+-- This is really bad and I shouldn't do it.
 showProcessed :: [([Paragraph], String)] -> String
 showProcessed p = "<html><body>" ++ (concatMap show onlyPs) ++ "</body></html>"
     where onlyPs = fst $ last p
@@ -74,8 +75,9 @@ oneOf xs = do
 oneOfConsume :: [String] -> ReadP String
 oneOfConsume xs = foldr1 (<++) $ map (string) xs
 
+-- not comprehensive
 specials :: [String]
-specials = ["*", "_", "`", "  \n", ">", "#", "+", "1.", "2.", "3.", "4."]
+specials = ["*", "_", "`", "  \n", ">", "#", "+", "1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.", "0."]
 
 -- parses markdown text which ends with a particular separator
 markdownText :: [String] -> ReadP String
